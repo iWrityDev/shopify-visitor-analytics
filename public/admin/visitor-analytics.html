@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visitor Analytics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --primary: #58a6ff;
+    --success: #3fb950;
+    --warning: #d29922;
+    --danger: #f85149;
+    --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; font-weight: 600; color: var(--text); flex: 1; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  select:focus { outline: 1px solid var(--primary); }
+  .btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); cursor: pointer; font-size: 13px; transition: background 0.2s; }
+  .btn:hover { background: var(--border); }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: #000; font-weight: 600; }
+  .btn-primary:hover { background: #79b8ff; }
+  .btn-danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
+  .live-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  main { padding: 24px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .stat-card .label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--text); }
+  .stat-card .sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .stat-card.live .value { color: var(--success); }
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .chart-container { position: relative; height: 200px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; color: var(--text2); transition: all 0.2s; }
+  .tab.active { color: var(--text); border-bottom-color: var(--primary); }
+  .tab:hover { color: var(--text); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 12px; font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg3); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--success); }
+  .badge-blue { background: rgba(88,166,255,0.15); color: var(--primary); }
+  .badge-yellow { background: rgba(210,153,34,0.15); color: var(--warning); }
+  .section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .session-row { border-bottom: 1px solid var(--border); padding: 10px 0; }
+  .session-row:last-child { border-bottom: none; }
+  .session-header { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .session-header:hover { color: var(--primary); }
+  .session-pages { display: none; padding: 8px 0 0 20px; }
+  .session-pages.open { display: block; }
+  .page-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--text2); }
+  .page-item::before { content: "→"; color: var(--primary); }
+  .empty-state { text-align: center; padding: 48px; color: var(--text2); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .auto-refresh { font-size: 12px; color: var(--text2); }
+  #lastUpdated { color: var(--primary); }
+  .source-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .source-bar-fill { height: 8px; border-radius: 4px; background: var(--primary); transition: width 0.5s; }
+  .source-name { font-size: 13px; min-width: 100px; }
+  .source-count { font-size: 13px; color: var(--text2); margin-left: auto; }
+  .funnel-bar { margin-bottom: 12px; }
+  .funnel-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .funnel-track { background: var(--bg3); border-radius: 4px; height: 24px; overflow: hidden; }
+  .funnel-fill { height: 100%; border-radius: 4px; transition: width 0.5s; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 600; color: #fff; }
+  .admin-buttons { display: flex; gap: 8px; margin-left: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 Visitor Analytics</h1>
+  <div class="controls">
+    <select id="storeFilter">
+      <option value="all">All Stores</option>
+      <option value="skriuwer.myshopify.com">Skriuwer</option>
+      <option value="masterlanguage.myshopify.com">Master Language</option>
+    </select>
+    <select id="dateRange">
+      <option value="1">Last 24h</option>
+      <option value="7" selected>Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <div class="admin-buttons">
+      <button class="btn btn-danger" onclick="excludeVisits()">🚫 Exclude My Visits</button>
+      <button class="btn" onclick="removeExclusion()">✅ Remove Exclusion</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="live-dot"></div>
+      <span style="font-size:13px;color:var(--text2);">Auto-refreshes every 30s</span>
+    </div>
+    <div class="auto-refresh">Last updated: <span id="lastUpdated">—</span></div>
+  </div>
+  
+  <div class="stat-grid" id="statsGrid">
+    <div class="stat-card live">
+      <div class="label">Live Visitors</div>
+      <div class="value" id="liveVisitors">—</div>
+      <div class="sub">Active now</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Visitors</div>
+      <div class="value" id="totalVisitors">—</div>
+      <div class="sub">In selected period</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Conversions</div>
+      <div class="value" id="conversions">—</div>
+      <div class="sub">Orders completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Conversion Rate</div>
+      <div class="value" id="conversionRate">—</div>
+      <div class="sub">Of all visitors</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Bounce Rate</div>
+      <div class="value" id="bounceRate">—</div>
+      <div class="sub">Single page visits</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Bounce Time</div>
+      <div class="value" id="avgBounceTime">—</div>
+      <div class="sub">Before leaving</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Time on Site</div>
+      <div class="value" id="avgTime">—</div>
+      <div class="sub">Non-bounce sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Pages / Visit</div>
+      <div class="value" id="pagesPerVisit">—</div>
+      <div class="sub">Average</div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card" style="grid-column: span 2">
+      <h3>Daily Visitors & Conversions</h3>
+      <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Conversion Funnel</h3>
+      <div id="funnelContainer"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Device Breakdown</h3>
+      <div class="chart-container"><canvas id="deviceChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Traffic Sources</h3>
+      <div id="sourcesContainer"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top Countries</h3>
+      <div id="countriesContainer"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('live')">🔴 Live</div>
+    <div class="tab" onclick="switchTab('sessions')">📋 Sessions</div>
+    <div class="tab" onclick="switchTab('pages')">📄 Pages</div>
+  </div>
+
+  <div id="tabLive" class="tab-panel active">
+    <div class="section">
+      <h3>Active Visitors <span id="liveCount" style="color:var(--success)"></span></h3>
+      <div id="liveTable">
+        <div class="empty-state"><div class="icon">👁</div><p>No active visitors right now</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabSessions" class="tab-panel">
+    <div class="section">
+      <h3>Session History</h3>
+      <div id="sessionsTable">
+        <div class="empty-state"><div class="icon">📋</div><p>No sessions yet</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabPages" class="tab-panel">
+    <div class="section">
+      <h3>Page Performance</h3>
+      <div id="pagesTable">
+        <div class="empty-state"><div class="icon">📄</div><p>No page data yet</p></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const API_BASE = window.location.origin;
+let dailyChart = null;
+let deviceChart = null;
+
+function formatTime(seconds) {
+  if (!seconds || seconds === 0) return '0s';
+  if (seconds < 60) return seconds + 's';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m + 'm ' + (s > 0 ? s + 's' : '');
+}
+
+function formatDate(ts) {
+  return new Date(ts).toLocaleString();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['live', 'sessions', 'pages'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+}
+
+async function fetchStats() {
+  const store = document.getElementById('storeFilter').value;
+  const days = document.getElementById('dateRange').value;
+  try {
+    const r = await fetch(API_BASE + '/api/analytics/stats?days=' + days + '&store=' + store);
+    const d = await r.json();
+    if (!d.stats) return;
+    const s = d.stats;
+    
+    document.getElementById('totalVisitors').textContent = s.totalVisitors || 0;
+    document.getElementById('conversions').textContent = s.conversions || 0;
+    document.getElementById('conversionRate').textContent = (s.conversionRate || 0) + '%';
+    document.getElementById('bounceRate').textContent = (s.bounceRate || 0) + '%';
+    document.getElementById('avgBounceTime').textContent = formatTime(s.avgBounceTime || 0);
+    document.getElementById('avgTime').textContent = formatTime(s.avgTime || 0);
+    document.getElementById('pagesPerVisit').textContent = s.avgPages || '0';
+    
+    // Daily chart
+    if (s.daily && s.daily.length > 0) {
+      renderDailyChart(s.daily);
+    }
+    
+    // Funnel
+    if (s.funnel) renderFunnel(s.funnel);
+    
+    // Devices
+    if (s.devices) renderDeviceChart(s.devices);
+    
+    // Sources
+    if (s.sources) renderSources(s.sources);
+    
+    // Countries
+    if (s.countries) renderCountries(s.countries);
+    
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  } catch(e) {
+    console.error('Stats error:', e);
+  }
+}
+
+async function fetchRealtime() {
+  const store = document.getElementById('storeFilter').value;
+  try {
+    const r = await fetch(API_BASE + '/api/analytics/realtime?store=' + store);
+    const d = await r.json();
+    document.getElementById('liveVisitors').textContent = d.liveCount || 0;
+    document.getElementById('liveCount').textContent = '(' + (d.liveCount || 0) + ' active)';
+    
+    if (d.sessions && d.sessions.length > 0) {
+      document.getElementById('liveTable').innerHTML = 
+        '<table><thead><tr><th>Session</th><th>Current Page</th><th>Device</th><th>Country</th><th>Store</th><th>Duration</th></tr></thead><tbody>' +
+        d.sessions.map(s => {
+          const dur = Math.round((Date.now() - s.startTime) / 1000);
+          return '<tr><td><code style="font-size:11px;color:var(--text2)">' + s.sessionId.substring(0,8) + '...</code></td>' +
+            '<td style="color:var(--primary)">' + (s.currentPage || '/') + '</td>' +
+            '<td>' + (s.device || '—') + '</td>' +
+            '<td>' + (s.country || '—') + '</td>' +
+            '<td>' + (s.store || '—').split('.')[0] + '</td>' +
+            '<td>' + formatTime(dur) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    } else {
+      document.getElementById('liveTable').innerHTML = '<div class="empty-state"><div class="icon">👁</div><p>No active visitors right now</p></div>';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function fetchSessions() {
+  const store = document.getElementById('storeFilter').value;
+  try {
+    const r = await fetch(API_BASE + '/api/analytics/sessions?store=' + store + '&limit=50');
+    const d = await r.json();
+    if (!d.sessions || d.sessions.length === 0) {
+      document.getElementById('sessionsTable').innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No sessions yet</p></div>';
+      return;
+    }
+    let html = '<div>';
+    d.sessions.forEach((s, i) => {
+      const dur = formatTime(s.totalTime || 0);
+      const conv = s.converted ? '<span class="badge badge-green">✓ Converted</span>' : (s.bounced ? '<span class="badge badge-yellow">Bounced</span>' : '<span class="badge badge-blue">Active</span>');
+      html += '<div class="session-row">';
+      html += '<div class="session-header" onclick="toggleSession(' + i + ')">';
+      html += '<code style="font-size:11px;color:var(--text2)">' + (s.sessionId||'').substring(0,8) + '...</code>';
+      html += '<span style="color:var(--text2);font-size:12px">' + formatDate(s.startTime) + '</span>';
+      html += conv;
+      html += '<span style="font-size:12px;color:var(--text2)">📱' + (s.device||'?') + '</span>';
+      html += '<span style="font-size:12px;color:var(--text2)">🌍' + (s.country||'?') + '</span>';
+      html += '<span style="font-size:12px;color:var(--text2)">⏱' + dur + '</span>';
+      html += '<span style="font-size:12px;color:var(--text2)">📄' + (s.pages||[]).length + ' pages</span>';
+      html += '</div>';
+      html += '<div class="session-pages" id="sess' + i + '">';
+      (s.pages||[]).forEach(p => {
+        const scroll = s.scrollDepths && s.scrollDepths[p] ? ' (' + s.scrollDepths[p] + '% scroll)' : '';
+        html += '<div class="page-item">' + p + '<span style="color:var(--text2)">' + scroll + '</span></div>';
+      });
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById('sessionsTable').innerHTML = html;
+  } catch(e) { console.error(e); }
+}
+
+async function fetchPages() {
+  const store = document.getElementById('storeFilter').value;
+  const days = document.getElementById('dateRange').value;
+  try {
+    const r = await fetch(API_BASE + '/api/analytics/pages?store=' + store + '&days=' + days);
+    const d = await r.json();
+    if (!d.pages || d.pages.length === 0) {
+      document.getElementById('pagesTable').innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>No page data yet</p></div>';
+      return;
+    }
+    document.getElementById('pagesTable').innerHTML = 
+      '<table><thead><tr><th>Page</th><th>Views</th><th>Avg Scroll</th></tr></thead><tbody>' +
+      d.pages.map(p => '<tr><td style="color:var(--primary)">' + p.page + '</td><td>' + p.views + '</td><td>' + (p.avgScroll||0) + '%</td></tr>').join('') +
+      '</tbody></table>';
+  } catch(e) { console.error(e); }
+}
+
+function toggleSession(i) {
+  const el = document.getElementById('sess' + i);
+  if (el) el.classList.toggle('open');
+}
+
+function renderDailyChart(daily) {
+  const ctx = document.getElementById('dailyChart').getContext('2d');
+  if (dailyChart) dailyChart.destroy();
+  dailyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: daily.map(d => d.date),
+      datasets: [
+        { label: 'Visitors', data: daily.map(d => d.visitors), borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', tension: 0.3, fill: true },
+        { label: 'Conversions', data: daily.map(d => d.conversions), borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.1)', tension: 0.3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
+      }
+    }
+  });
+}
+
+function renderDeviceChart(devices) {
+  const ctx = document.getElementById('deviceChart').getContext('2d');
+  if (deviceChart) deviceChart.destroy();
+  const labels = Object.keys(devices);
+  const values = Object.values(devices);
+  deviceChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: ['#58a6ff','#3fb950','#bc8cff','#d29922'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: '#8b949e', font: { size: 11 }, padding: 10 } } }
+    }
+  });
+}
+
+function renderFunnel(funnel) {
+  const steps = [
+    { label: 'Product Views', value: funnel.productViews, color: '#58a6ff' },
+    { label: 'Cart', value: funnel.cartViews, color: '#bc8cff' },
+    { label: 'Checkout', value: funnel.checkoutViews, color: '#d29922' },
+    { label: 'Orders', value: funnel.orders, color: '#3fb950' }
+  ];
+  const max = Math.max(...steps.map(s => s.value), 1);
+  document.getElementById('funnelContainer').innerHTML = steps.map(s => {
+    const pct = Math.round((s.value / max) * 100);
+    return '<div class="funnel-bar"><div class="funnel-label"><span>' + s.label + '</span><span>' + s.value + '</span></div>' +
+      '<div class="funnel-track"><div class="funnel-fill" style="width:' + pct + '%;background:' + s.color + '">' + (pct > 10 ? pct + '%' : '') + '</div></div></div>';
+  }).join('');
+}
+
+function renderSources(sources) {
+  if (!sources || sources.length === 0) { document.getElementById('sourcesContainer').innerHTML = '<p style="color:var(--text2);font-size:13px">No data</p>'; return; }
+  const max = Math.max(...sources.map(s => s.count), 1);
+  document.getElementById('sourcesContainer').innerHTML = sources.slice(0, 8).map(s => {
+    const pct = Math.round((s.count / max) * 100);
+    return '<div class="source-bar"><span class="source-name">' + s.source + '</span>' +
+      '<div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;">' +
+      '<div class="source-bar-fill" style="width:' + pct + '%"></div></div>' +
+      '<span class="source-count">' + s.count + '</span></div>';
+  }).join('');
+}
+
+function renderCountries(countries) {
+  if (!countries || countries.length === 0) { document.getElementById('countriesContainer').innerHTML = '<p style="color:var(--text2);font-size:13px">No data</p>'; return; }
+  document.getElementById('countriesContainer').innerHTML = 
+    '<table><thead><tr><th>Country</th><th>Visitors</th><th>Conv. Rate</th></tr></thead><tbody>' +
+    countries.map(c => '<tr><td>' + c.country + '</td><td>' + c.visitors + '</td><td>' + c.conversionRate + '%</td></tr>').join('') +
+    '</tbody></table>';
+}
+
+async function excludeVisits() {
+  try {
+    await fetch(API_BASE + '/api/track/exclude?action=set');
+    alert('✅ Your visits will now be excluded from tracking.');
+  } catch(e) { alert('Set vtexclude=1 cookie in your browser for: ' + window.location.hostname); }
+}
+
+async function removeExclusion() {
+  try {
+    await fetch(API_BASE + '/api/track/exclude?action=remove');
+    alert('✅ Exclusion removed. Your visits will now be tracked.');
+  } catch(e) { alert('Error removing exclusion'); }
+}
+
+async function refreshAll() {
+  await Promise.all([fetchStats(), fetchRealtime(), fetchSessions(), fetchPages()]);
+}
+
+document.getElementById('storeFilter').addEventListener('change', refreshAll);
+document.getElementById('dateRange').addEventListener('change', refreshAll);
+
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
